@@ -1,0 +1,27 @@
+{
+  "name": "@codebase-intelligence/providers",
+  "version": "0.1.0",
+  "description": "Source providers: GitLab, GitHub, Local workspace adapters",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@codebase-intelligence/core": "^0.1.0",
+    "simple-git": "^3.22.0",
+    "chokidar": "^3.6.0"
+  },
+  "peerDependencies": {
+    "@octokit/rest": "^20.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@octokit/rest": {
+      "optional": true
+    }
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,49 @@
+# Codebase Intelligence — 默认配置模板（复制后按需删减）
+# 顶层字段与 types/config.ts / loadConfig 合并逻辑一致。
+
+sources:
+  - provider: local
+    name: "Local Projects"
+    projects:
+      - path: ./
+        name: my-project
+
+storage:
+  # 支持 ~/.xxx，运行时会展开为家目录绝对路径
+  dataDir: ~/.codebase-intelligence
+  vector:
+    provider: sqlite           # sqlite | chromadb | qdrant
+    # collectionPrefix: ci_    # 可选：表/集合前缀
+    # url: :memory:            # SQLite 可改为内存库（测试用）
+    # --- ChromaDB 时取消注释 ---
+    # provider: chromadb
+    # url: http://localhost:8000
+  meta:
+    provider: sqlite
+
+embedding:
+  provider: ollama             # ollama | openai | custom_http
+  model: nomic-embed-text
+  url: http://localhost:11434
+  dimensions: 768
+  batchSize: 32
+  # apiKeyEnv: OPENAI_API_KEY  # openai / custom_http 常用
+  # extraHeaders: {}           # 例如 Azure api-version
+
+sync:
+  strategy: incremental
+  # Cron 表达式（给外部调度器参考；CLI 不内置 cron 守护）
+  cron: "0 */6 * * *"
+  concurrency: 3               # 不同「仓库」并行数；同一仓库多分支在引擎内串行
+  # workspace: /path/to/repos  # 可选：clone 根目录，默认 <dataDir>/repos
+
+# HTTP：Webhook + 状态 API。启动：codebase-intelligence serve [-c 本文件] [--port] [--sync-on-start]
+server:
+  port: 9876
+  # host: 0.0.0.0             # 默认 listen 0.0.0.0（见 CIServer）
+
+# Webhook 示例（在 GitLab/GitHub 项目设置里配置 URL）：
+#   GitLab Push → POST http://<host>:<port>/webhook/gitlab
+#   GitHub push → POST http://<host>:<port>/webhook/github
+# 匹配规则：GitLab 使用 project.path_with_namespace 与 projects[].name 全路径一致；
+#          GitHub 使用 repository.full_name 或 name 与已发现项目匹配。

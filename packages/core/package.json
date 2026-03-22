@@ -1,0 +1,30 @@
+{
+  "name": "@codebase-intelligence/core",
+  "version": "0.1.0",
+  "description": "Core indexing engine: parse, embed, store, query",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "yaml": "^2.3.4",
+    "glob": "^10.3.10"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8"
+  },
+  "peerDependencies": {
+    "chromadb": "^1.8.0"
+  },
+  "peerDependenciesMeta": {
+    "chromadb": {
+      "optional": true
+    }
+  },
+  "license": "MIT"
+}

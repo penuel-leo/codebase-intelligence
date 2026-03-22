@@ -1,0 +1,36 @@
+{
+  "name": "codebase-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pluggable code repository intelligence engine. Connect GitLab, GitHub, or local projects — auto-sync, index, and understand your entire codebase.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/penuel-leo/codebase-intelligence.git"
+  },
+  "bugs": {
+    "url": "https://github.com/penuel-leo/codebase-intelligence/issues"
+  },
+  "homepage": "https://github.com/penuel-leo/codebase-intelligence#readme",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "clean": "npm run clean --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint packages/*/src/**/*.ts",
+    "ci": "npx codebase-intelligence"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0"
+  }
+}

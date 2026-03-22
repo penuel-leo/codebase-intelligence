@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  # ─── Option 1: Standalone (SQLite, zero dependencies) ───
+  codebase-intelligence:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ci-data:/data
+      - ./config.yaml:/data/config.yaml:ro
+    environment:
+      - CI_CONFIG_PATH=/data/config.yaml
+      - CI_DATA_DIR=/data
+      # Uncomment and set tokens as needed:
+      # - GITLAB_TOKEN=${GITLAB_TOKEN}
+      # - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+    # Run sync on schedule (every 6 hours)
+    # Override with: docker compose run codebase-intelligence query "your question"
+    command: ["sync"]
+
+  # ─── Option 2: With ChromaDB for production scale ───
+  # Uncomment if you need ChromaDB instead of SQLite:
+
+  # chromadb:
+  #   image: chromadb/chroma:latest
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - chroma-data:/chroma/chroma
+
+  # ─── Option 3: With Ollama for local embedding ───
+  # Uncomment if running Ollama in Docker:
+
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   # Pull the embedding model on first run:
+  #   # docker compose exec ollama ollama pull nomic-embed-text
+
+volumes:
+  ci-data:
+  # chroma-data:
+  # ollama-data:

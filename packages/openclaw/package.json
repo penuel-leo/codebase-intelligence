@@ -1,0 +1,18 @@
+{
+  "name": "@codebase-intelligence/openclaw",
+  "version": "0.1.0",
+  "description": "OpenClaw skill + plugin adapter for codebase-intelligence",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@codebase-intelligence/core": "^0.1.0",
+    "@codebase-intelligence/providers": "^0.1.0"
+  },
+  "license": "MIT"
+}

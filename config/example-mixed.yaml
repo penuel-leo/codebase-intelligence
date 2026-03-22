@@ -1,0 +1,68 @@
+# Codebase Intelligence — Multi-Source Mixed Configuration
+# Combines GitLab + GitHub + Local in one config.
+
+sources:
+  # ─── GitLab (self-hosted) ───
+  - provider: gitlab
+    name: "Example GitLab"
+    url: https://gitlab.yourcompany.com
+    tokenEnv: GITLAB_TOKEN
+    branches: [main, develop]
+    includeWiki: true
+    projects:
+      - group: backend-team
+      - id: 42
+        name: user-service
+
+  # ─── GitHub ───
+  - provider: github
+    name: "Open Source"
+    tokenEnv: GITHUB_TOKEN
+    branches: [main]
+    projects:
+      - org: your-org
+
+  # ─── Local Development ───
+  - provider: local
+    name: "Local Dev"
+    projects:
+      - path: /Users/dev/projects/mobile-app
+        name: mobile-app
+      - path: /Users/dev/projects/data-pipeline
+        name: data-pipeline
+
+storage:
+  dataDir: ~/.codebase-intelligence
+  vector:
+    provider: sqlite           # sqlite | chromadb | qdrant
+    # For ChromaDB:
+    # provider: chromadb
+    # url: http://localhost:8000
+  meta:
+    provider: sqlite
+
+embedding:
+  provider: ollama
+  model: nomic-embed-text
+  url: http://localhost:11434
+  dimensions: 768
+  batchSize: 32
+
+sync:
+  strategy: incremental
+  cron: "0 */6 * * *"
+  concurrency: 3
+
+# HTTP server for webhook receiver + status API
+# Start with: codebase-intelligence serve --port 9876
+server:
+  port: 9876
+  # host: 0.0.0.0
+
+# Webhook（需先运行: codebase-intelligence serve -c 本文件）
+# GitLab: project.path_with_namespace 须与上面 projects 里 name / group 发现名一致（全路径）
+# GitLab UI: Settings → Webhooks → http://your-host:9876/webhook/gitlab → Push events
+# GitHub: Settings → Webhooks → http://your-host:9876/webhook/github → Just the push event
+# 状态: GET http://localhost:9876/api/status  |  项目列表: GET /api/projects
+#
+# 其它顶层字段说明见 config/default.yaml（embedding 变体、vector url、sync.workspace 等）
