@@ -13,7 +13,7 @@ import type {
   ProviderType,
   ProjectMeta,
   FileChange,
-  WikiPage,
+  DocsPage,
 } from '@codebase-intelligence/core';
 import type { SourceProvider, ProviderConfig, ProviderProjectConfig } from './interface.js';
 import { parseNameStatus, safeCheckout, safePull, safeClone } from './git-utils.js';
@@ -24,7 +24,7 @@ interface GitLabProject {
   url: string;
   branches: string[];
   defaultBranch: string;
-  includeWiki: boolean;
+  includeDocs: boolean;
   localPath: string;
   git?: SimpleGit;
 }
@@ -156,25 +156,25 @@ export class GitLabProvider implements SourceProvider {
     return this.getProject(project).localPath;
   }
 
-  async getWikiPages(project: string): Promise<WikiPage[]> {
+  async getDocsPages(project: string): Promise<DocsPage[]> {
     const proj = this.getProject(project);
-    if (!proj.includeWiki) return [];
+    if (!proj.includeDocs) return [];
 
-    const wikiPath = join(this.workspace, `${proj.name}.wiki`);
-    if (!existsSync(wikiPath)) {
-      const wikiUrl = `${this.buildCloneUrl(proj).replace('.git', '.wiki.git')}`;
+    const docsPath = join(this.workspace, `${proj.name}.wiki`);
+    if (!existsSync(docsPath)) {
+      const docsUrl = `${this.buildCloneUrl(proj).replace('.git', '.wiki.git')}`;
       try {
-        await simpleGit().clone(wikiUrl, wikiPath, ['--depth=1']);
+        await simpleGit().clone(docsUrl, docsPath, ['--depth=1']);
       } catch { return []; }
     } else {
-      try { await simpleGit(wikiPath).pull(); } catch { /* ignore */ }
+      try { await simpleGit(docsPath).pull(); } catch { /* ignore */ }
     }
 
-    const pages: WikiPage[] = [];
+    const pages: DocsPage[] = [];
     try {
-      const files = readdirSync(wikiPath).filter(f => f.endsWith('.md'));
+      const files = readdirSync(docsPath).filter(f => f.endsWith('.md'));
       for (const file of files) {
-        const content = readFileSync(join(wikiPath, file), 'utf-8');
+        const content = readFileSync(join(docsPath, file), 'utf-8');
         pages.push({
           title: file.replace('.md', ''),
           slug: file.replace('.md', '').toLowerCase().replace(/\s+/g, '-'),
@@ -206,7 +206,7 @@ export class GitLabProvider implements SourceProvider {
       url: `${this.baseUrl}/${name}`,
       branches,
       defaultBranch: branches[0] ?? 'main',
-      includeWiki: config.includeWiki ?? parentConfig.includeWiki ?? false,
+      includeDocs: config.includeDocs ?? parentConfig.includeDocs ?? false,
       localPath: join(this.workspace, name),
     };
   }
@@ -240,7 +240,7 @@ export class GitLabProvider implements SourceProvider {
         url: p.web_url,
         branches,
         defaultBranch: p.default_branch ?? branches[0] ?? 'main',
-        includeWiki: config.includeWiki ?? false,
+        includeDocs: config.includeDocs ?? false,
         localPath: join(this.workspace, p.path),
       }));
     } catch (err: any) {

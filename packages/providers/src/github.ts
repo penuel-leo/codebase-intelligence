@@ -11,7 +11,7 @@ import type {
   ProviderType,
   ProjectMeta,
   FileChange,
-  WikiPage,
+  DocsPage,
 } from '@codebase-intelligence/core';
 import type { SourceProvider, ProviderConfig, ProviderProjectConfig } from './interface.js';
 import { parseNameStatus, safeCheckout, safePull, safeClone } from './git-utils.js';
@@ -22,7 +22,7 @@ interface GitHubProject {
   url: string;
   branches: string[];
   defaultBranch: string;
-  includeWiki: boolean;
+  includeDocs: boolean;
   localPath: string;
   git?: SimpleGit;
 }
@@ -141,24 +141,24 @@ export class GitHubProvider implements SourceProvider {
     return this.getProject(project).localPath;
   }
 
-  async getWikiPages(project: string): Promise<WikiPage[]> {
+  async getDocsPages(project: string): Promise<DocsPage[]> {
     const proj = this.getProject(project);
-    if (!proj.includeWiki) return [];
+    if (!proj.includeDocs) return [];
 
-    const wikiPath = join(this.workspace, `${proj.name}.wiki`);
-    if (!existsSync(wikiPath)) {
+    const docsPath = join(this.workspace, `${proj.name}.wiki`);
+    if (!existsSync(docsPath)) {
       try {
-        await simpleGit().clone(`https://github.com/${proj.repo}.wiki.git`, wikiPath, ['--depth=1']);
+        await simpleGit().clone(`https://github.com/${proj.repo}.wiki.git`, docsPath, ['--depth=1']);
       } catch { return []; }
     } else {
-      try { await simpleGit(wikiPath).pull(); } catch { /* ignore */ }
+      try { await simpleGit(docsPath).pull(); } catch { /* ignore */ }
     }
 
-    const pages: WikiPage[] = [];
+    const pages: DocsPage[] = [];
     try {
-      const files = readdirSync(wikiPath).filter(f => f.endsWith('.md'));
+      const files = readdirSync(docsPath).filter(f => f.endsWith('.md'));
       for (const file of files) {
-        const content = readFileSync(join(wikiPath, file), 'utf-8');
+        const content = readFileSync(join(docsPath, file), 'utf-8');
         pages.push({
           title: file.replace('.md', ''),
           slug: file.replace('.md', '').toLowerCase().replace(/\s+/g, '-'),
@@ -186,7 +186,7 @@ export class GitHubProvider implements SourceProvider {
     return {
       repo, name, url: `https://github.com/${repo}`,
       branches, defaultBranch: branches[0] ?? 'main',
-      includeWiki: config.includeWiki ?? parent.includeWiki ?? false,
+      includeDocs: config.includeDocs ?? parent.includeDocs ?? false,
       localPath: join(this.workspace, name),
     };
   }
@@ -209,7 +209,7 @@ export class GitHubProvider implements SourceProvider {
       return data.map(r => ({
         repo: r.full_name, name: r.name, url: r.html_url,
         branches, defaultBranch: r.default_branch ?? branches[0] ?? 'main',
-        includeWiki: config.includeWiki ?? false,
+        includeDocs: config.includeDocs ?? false,
         localPath: join(this.workspace, r.name),
       }));
     } catch (err: any) {

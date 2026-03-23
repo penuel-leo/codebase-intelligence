@@ -11,7 +11,7 @@ import type {
   ProjectMeta,
   FileChange,
   ChangeEvent,
-  WikiPage,
+  DocsPage,
 } from '@codebase-intelligence/core';
 import type { SourceProvider, ProviderConfig, ProviderProjectConfig } from './interface.js';
 import { parseNameStatus } from './git-utils.js';
@@ -148,10 +148,10 @@ export class LocalProvider implements SourceProvider {
     return this.getProject(project).path;
   }
 
-  async getWikiPages(project: string): Promise<WikiPage[]> {
+  async getDocsPages(project: string): Promise<DocsPage[]> {
     const proj = this.getProject(project);
     const docsDir = join(proj.path, 'docs');
-    const pages: WikiPage[] = [];
+    const pages: DocsPage[] = [];
 
     if (!existsSync(docsDir)) return pages;
 

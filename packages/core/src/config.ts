@@ -47,6 +47,9 @@ const DEFAULT_CONFIG: AppConfig = {
   server: {
     port: 9876,
   },
+  parser: {
+    mode: 'regex',
+  },
 };
 
 /** Search order for config file */

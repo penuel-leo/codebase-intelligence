@@ -7,13 +7,15 @@ import { join } from 'node:path';
 import { glob } from 'glob';
 import type { Chunk, DependencyEdge, FileChange, ProviderType } from '../types/index.js';
 import type { VectorStore } from '../store/vector-store.js';
+import { SqliteVecStore } from '../store/sqlite-vec-store.js';
 import type { EmbeddingProvider } from './embedding.js';
 import { analyzeDependencies, toEdges } from '../analysis/dependency-analyzer.js';
 import { routeFile, shouldIndex } from './router.js';
-import { parseCode } from './code-parser.js';
-import { parseWiki } from './wiki-parser.js';
+import { parseCode, type ParserMode } from './code-parser.js';
+import { parseDocs } from './docs-parser.js';
 import { parseApiDoc } from './api-doc-parser.js';
 import { parseConfig } from './config-parser.js';
+import { analyzeAstDependencies } from '../analysis/ast-dependency-analyzer.js';
 
 export interface IndexerConfig {
   project: string;
@@ -23,6 +25,8 @@ export interface IndexerConfig {
   commitSha?: string;
   /** Base web URL for the source (e.g., "https://gitlab.com/group/project"). Used to build webUrl for each chunk. */
   sourceUrl?: string;
+  /** Code parser mode: 'regex' (default) or 'tree-sitter' */
+  parserMode?: ParserMode;
   /**
    * First-sync resume: `resumeBase` = number of files skipped from the front of the full list.
    * `flush(absoluteExclusive)` is called with base+done (1-based count in full list).
@@ -43,6 +47,9 @@ export interface IndexResult {
 }
 
 export class Indexer {
+  /** Cache known project names per indexChanges run for docs cross-project association */
+  private knownProjectsCache?: string[];
+
   constructor(
     private store: VectorStore,
     private embedding: EmbeddingProvider,
@@ -53,6 +60,9 @@ export class Indexer {
    * Index changed files incrementally.
    */
   async indexChanges(changes: FileChange[], config: IndexerConfig): Promise<IndexResult> {
+    // Cache known projects for docs cross-project association (once per run)
+    this.knownProjectsCache = undefined;
+    await this.getKnownProjects();
     const result: IndexResult = {
       chunksAdded: 0,
       chunksDeleted: 0,
@@ -132,7 +142,7 @@ export class Indexer {
           await this.store.deleteByFile(routing.collection, config.project, change.path);
 
           // Parse into chunks
-          const chunks = this.parseFile(content, change.path, routing, config);
+          const chunks = await this.parseFile(content, change.path, routing, config);
 
           // Attach webUrl to each chunk
           if (config.sourceUrl) {
@@ -175,6 +185,9 @@ export class Indexer {
 
     if (total > 0) {
       await this.refreshProjectDependencyEdges(config);
+      if (this.store instanceof SqliteVecStore) {
+        this.store.recomputeCalledByForProject(config.project, config.branch);
+      }
     }
 
     return result;
@@ -191,12 +204,23 @@ export class Indexer {
     return this.indexChanges(changes, config);
   }
 
-  private parseFile(
+  private async getKnownProjects(): Promise<string[]> {
+    if (!this.knownProjectsCache) {
+      try {
+        this.knownProjectsCache = await this.store.listProjects();
+      } catch {
+        this.knownProjectsCache = [];
+      }
+    }
+    return this.knownProjectsCache;
+  }
+
+  private async parseFile(
     content: string,
     filePath: string,
     routing: ReturnType<typeof routeFile>,
     config: IndexerConfig,
-  ): Chunk[] {
+  ): Promise<Chunk[]> {
     const baseCtx = {
       project: config.project,
       provider: config.provider,
@@ -204,21 +228,27 @@ export class Indexer {
       filePath,
       commitSha: config.commitSha,
     };
+    const parserMode = config.parserMode ?? 'regex';
 
     switch (routing.parser) {
-      case 'code':
-        return parseCode(content, { ...baseCtx, language: routing.language ?? 'text' });
-      case 'wiki':
-        return parseWiki(content, baseCtx);
+      case 'code': {
+        const result = parseCode(content, { ...baseCtx, language: routing.language ?? 'text', parserMode });
+        return result instanceof Promise ? result : result;
+      }
+      case 'docs':
+        return parseDocs(content, { ...baseCtx, knownProjects: this.knownProjectsCache ?? [] });
       case 'api-doc':
         return parseApiDoc(content, baseCtx);
       case 'config':
         return parseConfig(content, baseCtx);
-      case 'migration':
-        // Treat migrations as code chunks with sql language
-        return parseCode(content, { ...baseCtx, language: 'sql' });
-      case 'proto':
-        return parseCode(content, { ...baseCtx, language: routing.language ?? 'proto' });
+      case 'migration': {
+        const result = parseCode(content, { ...baseCtx, language: 'sql', parserMode });
+        return result instanceof Promise ? result : result;
+      }
+      case 'proto': {
+        const result = parseCode(content, { ...baseCtx, language: routing.language ?? 'proto', parserMode });
+        return result instanceof Promise ? result : result;
+      }
       default:
         return [];
     }
@@ -285,7 +315,22 @@ export class Indexer {
       } catch {
         continue;
       }
-      const analysis = analyzeDependencies(content, lang);
+      // Use AST dep analyzer in tree-sitter mode, with regex fallback
+      let analysis = analyzeDependencies(content, lang);
+      if (config.parserMode === 'tree-sitter') {
+        try {
+          const astAnalysis = await analyzeAstDependencies(content, lang);
+          if (astAnalysis) {
+            // Merge: AST provides precise imports, regex provides HTTP/MQ/gRPC
+            analysis = {
+              ...analysis,
+              imports: astAnalysis.imports.length > 0 ? astAnalysis.imports : analysis.imports,
+            };
+          }
+        } catch {
+          // Fall through — use regex analysis
+        }
+      }
       edges.push(...toEdges(config.project, analysis));
     }
 

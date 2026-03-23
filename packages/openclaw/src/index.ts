@@ -1,5 +1,5 @@
 /**
  * This workspace package exists so the monorepo can typecheck and link `@codebase-intelligence/openclaw`.
- * OpenClaw skill files are installed/copied separately (e.g. into ~/.openclaw/skills); they do not import this entry.
+ * OpenClaw installs the skill from this package directory (SKILL.md + this stub); copy e.g. into ~/.openclaw/skills/codebase-intelligence/. Nothing here imports the skill file.
  */
 export {};

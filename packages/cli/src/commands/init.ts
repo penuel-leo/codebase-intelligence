@@ -1,10 +1,13 @@
 /**
- * `codebase-intelligence init` — generate a starter config file.
+ * `codebase-intelligence init` — create starter config if missing, ensure data dir, then try to
+ * add a `sync` line to the **system user crontab** via the `crontab` command (no extra npm packages).
+ * Safe to run multiple times: config is not overwritten when present; crontab block is refreshed.
  */
 
 import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { tryRegisterUserCrontabSync } from '../lib/crontab-user.js';
 
 const TEMPLATES: Record<string, string> = {
   local: `# Codebase Intelligence Configuration
@@ -49,7 +52,7 @@ sources:
     url: https://gitlab.example.com
     tokenEnv: GITLAB_TOKEN
     branches: [main]
-    includeWiki: true
+    includeDocs: true
     projects:
       - group: backend-team        # Import all projects in group
       # - id: 42                   # Or by project ID
@@ -113,7 +116,7 @@ sources:
     url: https://gitlab.example.com
     tokenEnv: GITLAB_TOKEN
     branches: [main, develop]
-    includeWiki: true
+    includeDocs: true
     projects:
       - group: backend-team
 
@@ -154,25 +157,30 @@ sync:
 
 export async function initCommand(options: { provider: string; dir: string }) {
   const configFile = 'codebase-intelligence.yaml';
+  const absConfig = resolve(process.cwd(), configFile);
 
-  if (existsSync(configFile)) {
-    console.log(`Config file already exists: ${configFile}`);
-    return;
+  if (!existsSync(configFile)) {
+    const template = TEMPLATES[options.provider] ?? TEMPLATES.local;
+    writeFileSync(configFile, template, 'utf-8');
+    console.log(`Created ${configFile} (provider: ${options.provider})`);
+  } else {
+    console.log(`${configFile} already exists — not overwritten.`);
   }
 
-  const template = TEMPLATES[options.provider] ?? TEMPLATES.local;
-  writeFileSync(configFile, template, 'utf-8');
-  console.log(`Created ${configFile} (provider: ${options.provider})`);
-
-  // Create data directory
   const dataDir = options.dir || join(homedir(), '.codebase-intelligence');
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true });
     console.log(`Created data directory: ${dataDir}`);
   }
 
+  if (existsSync(absConfig)) {
+    tryRegisterUserCrontabSync(absConfig);
+  }
+
   console.log('\nNext steps:');
   console.log('  1. Edit codebase-intelligence.yaml with your projects');
-  console.log('  2. Run: npx codebase-intelligence sync');
-  console.log('  3. Run: npx codebase-intelligence query "your question"');
+  console.log(
+    '  2. Run sync: `codebase-intelligence sync` once (first time), or wait for the user crontab job if it was registered',
+  );
+  console.log('  3. Search: `codebase-intelligence query "your question"`');
 }

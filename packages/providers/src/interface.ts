@@ -8,7 +8,7 @@ import type {
   ProjectMeta,
   FileChange,
   ChangeEvent,
-  WikiPage,
+  DocsPage,
   TreeEntry,
 } from '@codebase-intelligence/core';
 
@@ -27,8 +27,8 @@ export interface ProviderConfig {
   projects: ProviderProjectConfig[];
   /** Default branches to track */
   branches?: string[];
-  /** Include wiki */
-  includeWiki?: boolean;
+  /** Include docs */
+  includeDocs?: boolean;
 }
 
 export interface ProviderProjectConfig {
@@ -39,7 +39,7 @@ export interface ProviderProjectConfig {
   group?: string;
   org?: string;
   branches?: string[];
-  includeWiki?: boolean;
+  includeDocs?: boolean;
 }
 
 export interface SourceProvider {
@@ -79,8 +79,8 @@ export interface SourceProvider {
   /** Get local repo path for a project */
   getLocalPath(project: string): string;
 
-  /** Get wiki pages (optional) */
-  getWikiPages?(project: string): Promise<WikiPage[]>;
+  /** Get docs pages (optional) */
+  getDocsPages?(project: string): Promise<DocsPage[]>;
 
   /** Start watching for changes (real-time mode) */
   startWatching?(callback: (event: ChangeEvent) => void): Promise<void>;

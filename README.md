@@ -66,6 +66,8 @@ cp ../config/example-mixed.yaml config.yaml
 docker compose up -d
 ```
 
+**Updates:** `npm update -g @codebase-intelligence/cli` for global installs; from source run `git pull`, `npm install`, `npm run build`. Re-copy the OpenClaw skill folder if you maintain it manually.
+
 ## Quick Start
 
 ```bash
@@ -120,6 +122,7 @@ embedding:
 sync:
   strategy: incremental
   concurrency: 3
+  cron: "0 */6 * * *"   # user crontab schedule that `init` registers (macOS/Linux)
 
 server:
   port: 9876
@@ -133,7 +136,7 @@ See `config/` for full examples: [default](config/default.yaml) | [gitlab](confi
 
 | Command | Description |
 |---|---|
-| `codebase-intelligence init` | Generate starter config |
+| `codebase-intelligence init` | Create `codebase-intelligence.yaml` if missing; on macOS/Linux, add a `sync` line to your **user crontab** using the system `crontab` command (not an npm package). Re-run anytime to refresh that line. On failure, only a warning is printed. |
 | `codebase-intelligence sync` | Sync all configured projects. Options: `--project <name>` (only that project), `--full` (force full sync / ignore incremental) |
 | `codebase-intelligence query <text>` | Search the index |
 | `codebase-intelligence status` | Show indexed project stats |
@@ -141,6 +144,8 @@ See `config/` for full examples: [default](config/default.yaml) | [gitlab](confi
 | `codebase-intelligence serve` | HTTP server (webhooks + status API) |
 
 After you add or change GitLab/GitHub projects in the config, run `codebase-intelligence sync` (no need to restart `serve` unless you change server bind settings). Webhooks will match projects that have been synced at least once.
+
+**First sync:** run `sync` manually once if you want an index immediately; otherwise the user crontab line (if `init` succeeded) will run `sync` on the `sync.cron` schedule. **Windows:** there is no user crontab — run `sync` manually or use Task Scheduler.
 
 ### Webhooks and HTTP server
 
@@ -159,7 +164,7 @@ codebase-intelligence serve -c codebase-intelligence.yaml
 ### Query Options
 
 ```
--t, --type <type>     Filter: code, api, docs, wiki (alias for docs), config
+-t, --type <type>     Filter: code, api, docs, config (`wiki` accepted as legacy alias for docs)
 -p, --project <name>  Filter by project
 -b, --branch <name>   Filter by branch
 -m, --mode <mode>     hybrid (default), keyword, vector
@@ -168,7 +173,7 @@ codebase-intelligence serve -c codebase-intelligence.yaml
 --detail              Print full chunk content for every result (human-readable mode)
 ```
 
-Omit `--type` to search all collections (code, API docs, wiki/docs, config) in one query.
+Omit `--type` to search all collections (code, API specs, docs, config) in one query.
 
 ## OpenClaw Integration
 

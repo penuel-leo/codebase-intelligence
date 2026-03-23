@@ -35,7 +35,7 @@ export interface ChangeEvent {
   timestamp: number;
 }
 
-export interface WikiPage {
+export interface DocsPage {
   title: string;
   slug: string;
   content: string;
@@ -50,11 +50,11 @@ export interface TreeEntry {
 
 // ─── Chunk Types ──────────────────────────────────────────────────
 
-export type ChunkType = 'code' | 'api' | 'wiki' | 'config' | 'migration' | 'proto';
+export type ChunkType = 'code' | 'api' | 'docs' | 'config' | 'migration' | 'proto';
 
 export type CodeChunkKind = 'class' | 'method' | 'function' | 'struct' | 'module' | 'interface' | 'enum' | 'type';
 export type ApiChunkKind = 'endpoint' | 'schema' | 'error_code';
-export type WikiChunkKind = 'page' | 'section';
+export type DocsChunkKind = 'page' | 'section';
 export type ConfigChunkKind = 'ci' | 'dockerfile' | 'k8s' | 'env' | 'config';
 export type MigrationChunkKind = 'table_create' | 'table_alter' | 'index';
 export type ProtoChunkKind = 'service' | 'rpc' | 'message';
@@ -62,7 +62,7 @@ export type ProtoChunkKind = 'service' | 'rpc' | 'message';
 export type ChunkKind =
   | CodeChunkKind
   | ApiChunkKind
-  | WikiChunkKind
+  | DocsChunkKind
   | ConfigChunkKind
   | MigrationChunkKind
   | ProtoChunkKind;
@@ -95,9 +95,19 @@ export interface ChunkMetadata {
   httpMethod?: string;
   apiPath?: string;
   tags?: string[];
-  /** Wiki-specific */
+  /** Docs-specific */
   pageTitle?: string;
   sectionHeading?: string;
+  /** Projects referenced by this doc chunk (cross-project association) */
+  relatedProjects?: string[];
+  /** Functions/methods called by this chunk (tree-sitter mode only) */
+  calls?: string[];
+  /** Callers that reference this chunk (inverse of `calls`; filled after sync for SQLite store) */
+  calledBy?: string[];
+  /** Class/interface this extends (tree-sitter mode only) */
+  extendsClass?: string;
+  /** Interfaces this implements (tree-sitter mode only) */
+  implementsInterfaces?: string[];
   /** Hash for deduplication */
   contentHash: string;
   /** Commit info */

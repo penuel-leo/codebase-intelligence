@@ -9,7 +9,7 @@ export interface FileRouting {
   type: ChunkType;
   collection: CollectionName;
   language?: string;
-  parser: 'code' | 'api-doc' | 'wiki' | 'config' | 'migration' | 'proto' | 'skip';
+  parser: 'code' | 'api-doc' | 'docs' | 'config' | 'migration' | 'proto' | 'skip';
 }
 
 const CODE_EXTENSIONS: Record<string, string> = {
@@ -47,7 +47,7 @@ const CONFIG_EXTENSIONS = new Set([
   '.env', '.properties',
 ]);
 
-const WIKI_EXTENSIONS = new Set(['.md', '.mdx', '.rst', '.txt', '.adoc']);
+const DOCS_EXTENSIONS = new Set(['.md', '.mdx', '.rst', '.txt', '.adoc']);
 
 const MIGRATION_PATTERNS = [
   /migrations?\//i,
@@ -128,9 +128,9 @@ export function routeFile(filePath: string): FileRouting {
     }
   }
 
-  // Wiki / documentation
-  if (WIKI_EXTENSIONS.has(ext)) {
-    return { type: 'wiki', collection: 'docs', parser: 'wiki' };
+  // Documentation
+  if (DOCS_EXTENSIONS.has(ext)) {
+    return { type: 'docs', collection: 'docs', parser: 'docs' };
   }
 
   // Source code

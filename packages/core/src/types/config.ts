@@ -13,6 +13,14 @@ export interface AppConfig {
   embedding: EmbeddingConfig;
   sync: SyncConfig;
   server?: ServerConfig;
+  parser?: ParserConfig;
+}
+
+// ─── Parser Config ──────────────────────────────────────────────
+
+export interface ParserConfig {
+  /** Code parser mode: 'regex' (default, zero native deps) or 'tree-sitter' (precise AST) */
+  mode: 'regex' | 'tree-sitter';
 }
 
 // ─── Source Provider Config ──────────────────────────────────────
@@ -25,7 +33,7 @@ export interface SourceConfig {
   tokenEnv?: string;
   projects: ProjectConfig[];
   branches?: string[];
-  includeWiki?: boolean;
+  includeDocs?: boolean;
   apiDocs?: ApiDocConfig[];
 }
 
@@ -38,7 +46,7 @@ export interface ProjectConfig {
   group?: string;
   org?: string;
   branches?: string[];
-  includeWiki?: boolean;
+  includeDocs?: boolean;
   apiDocs?: ApiDocConfig[];
 }
 

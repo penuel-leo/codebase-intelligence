@@ -9,6 +9,7 @@
  */
 
 import Database from 'better-sqlite3';
+import { buildCalledByMap, type CodeRowForCalls } from '../analysis/called-by.js';
 import type { Chunk, CollectionName, SearchFilter, DependencyEdge } from '../types/index.js';
 import type { VectorStore, VectorStoreQueryOptions, VectorStoreQueryResult } from './vector-store.js';
 
@@ -155,6 +156,8 @@ export class SqliteVecStore implements VectorStore {
     `);
     this.migrateSyncStateColumns();
     this.migrateChunkTableWebUrl();
+    this.migrateWikiToDocsType();
+    this.migrateRelatedProjectsAndAstColumns();
 
     // ─── Dependency graph table ───
     this.db.exec(`
@@ -203,6 +206,7 @@ export class SqliteVecStore implements VectorStore {
         symbol_name, class_name, package_name,
         http_method, api_path, tags,
         page_title, section_heading,
+        related_projects, calls, called_by, extends_class, implements_ifaces,
         content_hash, commit_sha, web_url, indexed_at, embedding
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?,
@@ -210,6 +214,7 @@ export class SqliteVecStore implements VectorStore {
         ?, ?, ?,
         ?, ?, ?,
         ?, ?,
+        ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?
       )
     `);
@@ -224,6 +229,11 @@ export class SqliteVecStore implements VectorStore {
           m.symbolName ?? null, m.className ?? null, m.packageName ?? null,
           m.httpMethod ?? null, m.apiPath ?? null, m.tags ? JSON.stringify(m.tags) : null,
           m.pageTitle ?? null, m.sectionHeading ?? null,
+          m.relatedProjects ? JSON.stringify(m.relatedProjects) : null,
+          m.calls ? JSON.stringify(m.calls) : null,
+          m.calledBy ? JSON.stringify(m.calledBy) : null,
+          m.extendsClass ?? null,
+          m.implementsInterfaces ? JSON.stringify(m.implementsInterfaces) : null,
           m.contentHash, m.commitSha ?? null, m.webUrl ?? null, m.indexedAt,
           chunk.embedding ? Buffer.from(new Float32Array(chunk.embedding).buffer) : null,
         );
@@ -451,6 +461,54 @@ export class SqliteVecStore implements VectorStore {
     this.db.prepare(`DELETE FROM ${this.prefix}dependencies WHERE from_service = ?`).run(fromService);
   }
 
+  /**
+   * Recompute `called_by` for all code chunks in a project+branch from `calls` (inverse graph).
+   * Runs after indexing; clears then sets `called_by`. Chunks with no callers get NULL.
+   */
+  recomputeCalledByForProject(project: string, branch: string): void {
+    const table = this.tableName('code');
+    const rows = this.db.prepare(
+      `SELECT id, file_path, symbol_name, class_name, chunk_kind, calls FROM ${table} WHERE project = ? AND branch = ?`,
+    ).all(project, branch) as Array<{
+      id: string;
+      file_path: string;
+      symbol_name: string | null;
+      class_name: string | null;
+      chunk_kind: string;
+      calls: string | null;
+    }>;
+
+    const lite: CodeRowForCalls[] = rows.map(r => {
+      let calls: string[] | null = null;
+      if (r.calls) {
+        try {
+          calls = JSON.parse(r.calls) as string[];
+        } catch {
+          calls = null;
+        }
+      }
+      return {
+        id: r.id,
+        filePath: r.file_path,
+        symbolName: r.symbol_name,
+        className: r.class_name,
+        chunkKind: r.chunk_kind,
+        calls,
+      };
+    });
+
+    const map = buildCalledByMap(lite);
+    this.db.prepare(`UPDATE ${table} SET called_by = NULL WHERE project = ? AND branch = ?`).run(project, branch);
+
+    const upd = this.db.prepare(`UPDATE ${table} SET called_by = ? WHERE id = ?`);
+    const tx = this.db.transaction(() => {
+      for (const [id, labels] of map) {
+        upd.run(JSON.stringify(labels), id);
+      }
+    });
+    tx();
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  META / STATUS
   // ═══════════════════════════════════════════════════════════════
@@ -471,6 +529,17 @@ export class SqliteVecStore implements VectorStore {
       for (const row of rows) projects.add(row.project);
     }
     return [...projects];
+  }
+
+  /** Get language distribution for a project (from code collection). */
+  getProjectLanguages(project: string): Record<string, number> {
+    const table = this.tableName('code');
+    const rows = this.db.prepare(
+      `SELECT language, COUNT(*) as cnt FROM ${table} WHERE project = ? AND language IS NOT NULL GROUP BY language ORDER BY cnt DESC`
+    ).all(project) as Array<{ language: string; cnt: number }>;
+    const result: Record<string, number> = {};
+    for (const row of rows) result[row.language] = row.cnt;
+    return result;
   }
 
   async close(): Promise<void> {
@@ -502,6 +571,34 @@ export class SqliteVecStore implements VectorStore {
         this.db.exec(`ALTER TABLE ${table} ADD COLUMN web_url TEXT`);
       } catch {
         /* column already exists */
+      }
+    }
+  }
+
+  /** Migrate existing 'wiki' type values to 'docs' (idempotent). */
+  private migrateWikiToDocsType(): void {
+    const table = this.tableName('docs');
+    this.db.exec(`UPDATE ${table} SET type = 'docs' WHERE type = 'wiki'`);
+  }
+
+  /** Add relatedProjects and AST metadata columns to all chunk tables (idempotent). */
+  private migrateRelatedProjectsAndAstColumns(): void {
+    const collections: CollectionName[] = ['code', 'api', 'docs', 'config'];
+    const newCols = [
+      ['related_projects', 'TEXT'],
+      ['calls', 'TEXT'],
+      ['called_by', 'TEXT'],
+      ['extends_class', 'TEXT'],
+      ['implements_ifaces', 'TEXT'],
+    ];
+    for (const col of collections) {
+      const table = this.tableName(col);
+      for (const [colName, colDef] of newCols) {
+        try {
+          this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${colName} ${colDef}`);
+        } catch {
+          /* column already exists */
+        }
       }
     }
   }
@@ -598,7 +695,18 @@ export class SqliteVecStore implements VectorStore {
     };
 
     addFilter('source', filter.source);
-    addFilter('project', filter.project);
+    // Project filter: also match chunks whose related_projects contain the project name
+    if (filter.project != null) {
+      const projects = Array.isArray(filter.project) ? filter.project : [filter.project];
+      const projectConds: string[] = [];
+      for (const p of projects) {
+        projectConds.push(`${q('project')} = ?`);
+        params.push(p);
+        projectConds.push(`${q('related_projects')} LIKE ?`);
+        params.push(`%"${p}"%`);
+      }
+      conditions.push(`(${projectConds.join(' OR ')})`);
+    }
     if (filter.branch) { conditions.push(`${q('branch')} = ?`); params.push(filter.branch); }
     addFilter('language', filter.language);
     if (filter.filePath) { conditions.push(`${q('file_path')} LIKE ?`); params.push(`%${filter.filePath}%`); }
@@ -618,6 +726,11 @@ export class SqliteVecStore implements VectorStore {
         httpMethod: row.http_method, apiPath: row.api_path,
         tags: row.tags ? JSON.parse(row.tags) : undefined,
         pageTitle: row.page_title, sectionHeading: row.section_heading,
+        relatedProjects: row.related_projects ? JSON.parse(row.related_projects) : undefined,
+        calls: row.calls ? JSON.parse(row.calls) : undefined,
+        calledBy: row.called_by ? JSON.parse(row.called_by) : undefined,
+        extendsClass: row.extends_class ?? undefined,
+        implementsInterfaces: row.implements_ifaces ? JSON.parse(row.implements_ifaces) : undefined,
         contentHash: row.content_hash, commitSha: row.commit_sha,
         webUrl: row.web_url ?? undefined, indexedAt: row.indexed_at,
       },

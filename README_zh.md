@@ -132,6 +132,7 @@ embedding:
 sync:
   strategy: incremental
   concurrency: 3
+  cron: "0 */6 * * *"   # 供 `init` 写入**用户 crontab** 的时间表达式（五个字段）；非应用内定时器
 
 # HTTP：Webhook + 状态 API（见下方「Webhook」）
 server:
@@ -146,14 +147,17 @@ server:
 
 | 命令 | 说明 |
 |---|---|
-| `codebase-intelligence init` | 生成配置文件 |
-| `codebase-intelligence sync` | 同步所有项目。选项：`--project <name>` 只同步该项目；`--full` 强制全量同步（忽略增量） |
+| `codebase-intelligence init` | 若当前目录没有 `codebase-intelligence.yaml` 则生成；**不会覆盖已有文件**。在 **macOS / Linux** 上会尝试用系统自带的 **`crontab`** 命令，往**当前用户的 crontab**里注册一行定时执行 `codebase-intelligence sync -c <绝对路径的 yaml>`（时刻来自配置里的 `sync.cron`）。**不安装任何 npm 的 cron 库**；若 `crontab` 写入失败，只打印警告，不影响 init 成功。可**反复执行** init，用于在系统装好 cron 服务后**刷新**这一段任务。Windows 无用户 crontab，仅提示使用「任务计划程序」。 |
+| `codebase-intelligence sync` | 拉取/对比变更并更新索引。选项：`--project` 只同步指定项目；`--full` 强制全量 |
 | `codebase-intelligence query <text>` | 搜索索引 |
 | `codebase-intelligence status` | 查看索引状态 |
 | `codebase-intelligence reindex <project>` | 全量重建某项目 |
 | `codebase-intelligence serve` | 启动 HTTP 服务（接收 Webhook，见下） |
+| `codebase-intelligence reload` | 校验 YAML 能否解析；不发起网络请求。若 `serve` 已在跑，需自行重启进程才能加载新配置 |
 
-在配置里新增或修改 GitLab/GitHub 项目后，执行 `codebase-intelligence sync` 即可；**不必**为此重启 `serve`（除非你改了服务监听地址/端口等）。Webhook 只会匹配已经至少成功同步过一次的项目。
+**`init` 不会自动执行 `sync`。** 首次想立刻有索引请**手动**执行一次 `sync`；之后若 crontab 注册成功，会按 `sync.cron` 周期自动 `sync`。配置了 Webhook 且运行 `serve` 时，**推送**也会触发对应项目的增量同步。配置变更后通常需要一次 `sync`（或等定时/Webhook）才能反映到索引。
+
+在配置里新增或修改 GitLab/GitHub 项目后，执行 `codebase-intelligence sync`；**不必**为此重启 `serve`（除非你改了监听地址/端口等）。Webhook 只会匹配已经至少成功同步过一次的项目。
 
 ### Webhook 与 HTTP 服务
 
@@ -172,7 +176,7 @@ codebase-intelligence serve -c codebase-intelligence.yaml
 ### 搜索选项
 
 ```
--t, --type <type>     过滤类型: code, api, docs, wiki（wiki 为 docs 的别名）, config
+-t, --type <type>     过滤类型: code, api, docs, config（`wiki` 仅作 docs 的兼容别名）
 -p, --project <name>  过滤项目
 -b, --branch <name>   过滤分支
 -m, --mode <mode>     搜索模式: hybrid(默认), keyword, vector
@@ -181,7 +185,7 @@ codebase-intelligence serve -c codebase-intelligence.yaml
 --detail              人类可读模式下输出每条结果的完整正文
 ```
 
-不传 `--type` 时会在所有集合（代码、API 文档、Wiki/文档、配置）中统一搜索。
+不传 `--type` 时会在所有集合（代码、API 文档、docs 文档、配置）中统一搜索。
 
 ### 搜索模式
 

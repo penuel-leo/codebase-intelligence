@@ -275,6 +275,7 @@ export class SyncEngine {
             branch,
             repoDir: provider.getLocalPath(project),
             commitSha: headCommit,
+            parserMode: this.config.parser?.mode,
             indexCheckpoint,
           });
 

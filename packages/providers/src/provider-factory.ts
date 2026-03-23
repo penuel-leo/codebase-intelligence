@@ -37,7 +37,7 @@ export async function createProvider(
     workspace,
     projects: source.projects,
     branches: source.branches,
-    includeWiki: source.includeWiki,
+    includeDocs: source.includeDocs,
   };
 
   await provider.init(config);

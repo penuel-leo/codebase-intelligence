@@ -1,6 +1,7 @@
 export { routeFile, shouldIndex } from './router.js';
-export { parseCode } from './code-parser.js';
-export { parseWiki } from './wiki-parser.js';
+export { parseCode, type ParserMode } from './code-parser.js';
+export { parseDocs } from './docs-parser.js';
+export { parseCodeAst, isAstAvailable } from './ast-code-parser.js';
 export { parseApiDoc } from './api-doc-parser.js';
 export { parseConfig } from './config-parser.js';
 export { Indexer } from './indexer.js';

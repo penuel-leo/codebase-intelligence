@@ -105,8 +105,8 @@ export class SearchEngine {
     return this.search(query, { collections: ['api'], filter, topK: topK ?? 10 });
   }
 
-  /** Search only wiki/documentation */
-  async searchWiki(query: string, filter?: SearchFilter, topK?: number): Promise<SearchResult[]> {
+  /** Search only documentation */
+  async searchDocs(query: string, filter?: SearchFilter, topK?: number): Promise<SearchResult[]> {
     return this.search(query, { collections: ['docs'], filter, topK: topK ?? 10 });
   }
 

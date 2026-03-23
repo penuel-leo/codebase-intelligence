@@ -9,6 +9,7 @@
  *   npx codebase-intelligence query "..."   # Search the index
  *   npx codebase-intelligence status        # Show sync status
  *   npx codebase-intelligence reindex <project>  # Full reindex
+ *   npx codebase-intelligence reload           # Validate config YAML
  */
 
 import { Command } from 'commander';
@@ -18,6 +19,7 @@ import { queryCommand } from './commands/query.js';
 import { statusCommand } from './commands/status.js';
 import { reindexCommand } from './commands/reindex.js';
 import { serveCommand } from './commands/serve.js';
+import { reloadCommand } from './commands/reload.js';
 
 const program = new Command();
 
@@ -28,7 +30,7 @@ program
 
 program
   .command('init')
-  .description('Initialize configuration file')
+  .description('Create config if needed; register periodic sync in user crontab via system `crontab` (non-fatal on failure). Re-run to refresh crontab.')
   .option('-p, --provider <type>', 'Provider type: gitlab, github, local', 'local')
   .option('-d, --dir <path>', 'Data directory', '')
   .action(initCommand);
@@ -39,6 +41,7 @@ program
   .option('-c, --config <path>', 'Config file path')
   .option('-p, --project <name>', 'Sync only this project')
   .option('--full', 'Force full sync (ignore incremental)')
+  .option('--parser <mode>', 'Parser mode: regex (default), tree-sitter')
   .action(syncCommand);
 
 program
@@ -64,6 +67,7 @@ program
   .command('reindex <project>')
   .description('Full reindex of a project')
   .option('-c, --config <path>', 'Config file path')
+  .option('--parser <mode>', 'Parser mode: regex (default), tree-sitter')
   .action(reindexCommand);
 
 program
@@ -72,6 +76,13 @@ program
   .option('-c, --config <path>', 'Config file path')
   .option('-p, --port <port>', 'Server port (default: 9876)')
   .option('--sync-on-start', 'Run a full sync when server starts')
+  .option('--parser <mode>', 'Parser mode: regex (default), tree-sitter')
   .action(serveCommand);
+
+program
+  .command('reload')
+  .description('Validate configuration YAML (no network; restart `serve` manually if it is running)')
+  .option('-c, --config <path>', 'Config file path')
+  .action(reloadCommand);
 
 program.parse();

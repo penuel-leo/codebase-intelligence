@@ -6,8 +6,13 @@
 import { loadConfig } from '@codebase-intelligence/core';
 import { SyncEngine } from '@codebase-intelligence/providers';
 
-export async function syncCommand(options: { config?: string; project?: string; full?: boolean }) {
+export async function syncCommand(options: { config?: string; project?: string; full?: boolean; parser?: string }) {
   const config = loadConfig(options.config);
+
+  // Override parser mode from CLI if specified
+  if (options.parser === 'regex' || options.parser === 'tree-sitter') {
+    config.parser = { mode: options.parser };
+  }
 
   const startTime = Date.now();
   let projectsDone = 0;
