@@ -1,9 +1,11 @@
 ---
 name: codebase-intelligence
 description: >
-  Deep understanding of codebase repositories (GitLab, GitHub, or local workspace).
-  Use when anyone asks about code logic, architecture, project dependencies, API definitions,
-  database schemas, or needs impact analysis for new requirements. Supports multi-project,
+  Deep understanding of code repositories or systems(GitLab, GitHub, or 
+  local workspace).
+  Use when anyone asks which repos or internal projects are indexed, for multi-dimensional
+  discovery across code, API specs, in-repo docs, and config; or for code logic, architecture,
+  service dependencies, database schemas, and change / impact analysis. Supports multi-project,
   multi-source cross-repo analysis.
 metadata:
   openclaw:
@@ -25,14 +27,31 @@ dependency metadata produced during indexing.
 All data is stored in SQLite with vector + FTS5 search. **Use the CLI for every operation**
 listed below; there is no separate HTTP search API.
 
+## Scope (what this skill covers)
+
+- **Covered:** Repositories or local directories **listed in `codebase-intelligence.yaml` and
+  successfully synced** into the index. That is the organization's **internal codebases** (and
+  their in-repo assets): application **code**, **docs**, **API** specs (e.g. OpenAPI), **config**
+  (CI/CD, containers, infra-as-code), plus dependency metadata produced during indexing.
+- **Not covered:** Arbitrary public repos, systems never added to the config, or org data outside
+  indexed repos (unless it appears in indexed markdown/config chunks).
+- **Indexed vs configured:** `codebase-intelligence status` lists **indexed** project names (data
+  in the store). A project only named in YAML but never successfully synced may be absent until
+  `sync` completes.
+
 ## When to activate
 
 Use this skill when the user asks about:
 
+- **Indexed repos / internal projects** — which codebases are in the index, rough coverage
+  (chunk counts per collection), or whether the index is empty → prefer `status` first
+- **Multi-dimensional internal discovery** — same topic across **code**, **API**, **docs**, and
+  **config** → `query` (hybrid first; then narrow with `--type` / `--project` / `--mode`)
 - **Code behavior** — how a feature works, what a function does, where logic lives
 - **Architecture** — services, boundaries, how systems relate, schemas
 - **HTTP/API contracts** — parameters, responses, which service exposes an endpoint
-- **Impact / change risk** — what breaks if an API or module changes
+- **Impact / change risk** — what breaks if an API or module changes (use indexed dependency
+  edges from sync where relevant)
 - **Design or placement** — where a capability should live
 - **Documentation** — runbooks, design notes, README-style material in indexed repos
 - **Onboarding** — high-level map of repos and responsibilities
@@ -40,10 +59,20 @@ Use this skill when the user asks about:
 
 ## How to answer
 
+### Step 0: Pick `status` vs `query`
+
+| User intent | Start with |
+|-------------|------------|
+| "What repos / internal projects do we have?", "What's indexed?", "Is X in the index?", index health / emptiness | `codebase-intelligence status` (`-c` if needed) |
+| Anything about **content** inside those repos (behavior, APIs, docs, config, architecture, impact) | `codebase-intelligence query ... --context` |
+
+`query` only searches **enrolled and indexed** projects; it does not discover repos that were
+never synced. After `status`, use broad `query` strings to explore; refine with flags below.
+
 ### Step 1: Search (`query`) — core workflow
 
-**`query` is the primary command.** `sync`, `reindex`, and `reload` only maintain or validate
-the index.
+**`query` is the primary command for content.** `sync`, `reindex`, and `reload` maintain or
+validate the index; `status` summarizes indexed projects.
 
 | Flag | Role |
 |------|------|
@@ -150,3 +179,4 @@ own project. That enables **`query --project X`** to surface documentation that 
 different repo but references `X`. Implementation: `findRelatedProjects` in
 `packages/core/src/pipeline/docs-parser.ts`; search filtering uses the `related_projects`
 column in `packages/core/src/store/sqlite-vec-store.ts` (`buildFilterClause`).
+

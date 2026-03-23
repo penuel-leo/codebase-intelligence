@@ -225,6 +225,8 @@ Skill 暴露以下工具给 Agent：
 - `codebase_search_api` — 只搜 API 定义
 - `codebase_impact` — 变更影响分析
 
+随包自带的 `SKILL.md` 还会指导 Agent：用 `codebase-intelligence status` 查看**已索引项目**清单（项目名与各集合 chunk 数），用 `query --context` 在代码、API 说明、文档、配置等维度检索。能力范围是**已接入且已同步**的内部代码仓库，不是全公司的 IT/系统资产目录。
+
 ### 作为 npm 包使用
 
 ```typescript

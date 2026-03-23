@@ -204,6 +204,8 @@ The skill exposes these tools to the agent:
 - `codebase_search_api` — search API definitions only
 - `codebase_impact` — analyze change impact
 
+The bundled `SKILL.md` also directs agents to run `codebase-intelligence status` for an **indexed-project** inventory (names and chunk counts) and to use `query --context` for multi-layer discovery across code, API specs, docs, and config. Coverage is **enrolled and synced internal codebases** only—not a full organization IT/system catalog.
+
 ### Use as npm Package
 
 ```typescript
