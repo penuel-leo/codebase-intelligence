@@ -3,10 +3,12 @@
  * Shows file-level progress during sync.
  */
 
-import { loadConfig } from '@codebase-intelligence/core';
+import { findConfigFile, loadConfig } from '@codebase-intelligence/core';
 import { SyncEngine } from '@codebase-intelligence/providers';
 
 export async function syncCommand(options: { config?: string; project?: string; full?: boolean; parser?: string }) {
+  const resolvedPath = findConfigFile(options.config);
+  console.log(`[sync] Config file: ${resolvedPath ? resolvedPath : '(none found, using defaults — add codebase-intelligence.yaml in cwd or use -c)'}`);
   const config = loadConfig(options.config);
 
   // Override parser mode from CLI if specified
