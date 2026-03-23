@@ -57,7 +57,6 @@ async function ensureTreeSitter(): Promise<boolean> {
 
   loadAttempted = true;
   try {
-    // @ts-expect-error — tree-sitter is an optional native dependency
     const mod = await import('tree-sitter');
     TreeSitter = mod.default || mod;
     return true;

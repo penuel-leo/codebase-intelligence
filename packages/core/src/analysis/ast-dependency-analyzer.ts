@@ -16,7 +16,6 @@ export async function analyzeAstDependencies(
 ): Promise<DependencyAnalysis | null> {
   let TreeSitter: any;
   try {
-    // @ts-expect-error — tree-sitter is an optional native dependency
     const mod = await import('tree-sitter');
     TreeSitter = mod.default || mod;
   } catch {

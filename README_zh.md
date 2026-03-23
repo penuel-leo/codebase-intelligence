@@ -54,6 +54,7 @@ git clone https://github.com/your-org/codebase-intelligence.git
 cd codebase-intelligence
 npm install
 npm run build
+cd packages/cli
 npm link
 ```
 
