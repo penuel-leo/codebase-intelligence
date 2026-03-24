@@ -81,8 +81,14 @@ export class GitHubProvider implements SourceProvider {
   async getHeadCommit(project: string): Promise<string> {
     const proj = this.getProject(project);
     if (!proj.git) return '';
-    const log = await proj.git.log({ maxCount: 1 });
-    return log.latest?.hash ?? '';
+    try {
+      const log = await proj.git.log({ maxCount: 1 });
+      return log.latest?.hash ?? '';
+    } catch (err: any) {
+      const msg = err?.message ?? '';
+      if (msg.includes('does not have any commits')) return '';
+      throw err;
+    }
   }
 
   async getFileContent(project: string, filePath: string): Promise<string> {
@@ -102,10 +108,10 @@ export class GitHubProvider implements SourceProvider {
     if (!proj.git) throw new Error(`Project ${project} not cloned`);
 
     const targetBranch = branch ?? proj.defaultBranch;
-    const beforeCommit = await this.getHeadCommit(project);
 
     await proj.git.fetch(['origin']);
     await safeCheckout(proj.git, targetBranch);
+    const beforeCommit = await this.getHeadCommit(project);
     await safePull(proj.git, targetBranch);
 
     const afterCommit = await this.getHeadCommit(project);

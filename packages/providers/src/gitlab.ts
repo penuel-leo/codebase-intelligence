@@ -87,8 +87,14 @@ export class GitLabProvider implements SourceProvider {
   async getHeadCommit(project: string): Promise<string> {
     const proj = this.getProject(project);
     if (!proj.git) return '';
-    const log = await proj.git.log({ maxCount: 1 });
-    return log.latest?.hash ?? '';
+    try {
+      const log = await proj.git.log({ maxCount: 1 });
+      return log.latest?.hash ?? '';
+    } catch (err: any) {
+      const msg = err?.message ?? '';
+      if (msg.includes('does not have any commits')) return '';
+      throw err;
+    }
   }
 
   async getFileContent(project: string, filePath: string): Promise<string> {
@@ -111,11 +117,12 @@ export class GitLabProvider implements SourceProvider {
     if (!proj.git) throw new Error(`Project ${project} not cloned`);
 
     const targetBranch = branch ?? proj.defaultBranch;
-    const beforeCommit = await this.getHeadCommit(project);
 
-    // Fetch all remote refs (lightweight, only downloads new objects)
+    // Fetch + checkout before reading HEAD: empty clones have no commits until
+    // the target branch exists; multi-branch sync must compare the target branch only.
     await proj.git.fetch(['origin']);
     await safeCheckout(proj.git, targetBranch);
+    const beforeCommit = await this.getHeadCommit(project);
     await safePull(proj.git, targetBranch);
 
     const afterCommit = await this.getHeadCommit(project);

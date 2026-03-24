@@ -115,24 +115,28 @@ export class LocalProvider implements SourceProvider {
 
   async pull(project: string, branch?: string): Promise<{ headCommit: string; hasChanges: boolean }> {
     const proj = this.getProject(project);
-    const beforeCommit = await this.getHeadCommit(project);
     try {
       if (branch) {
-        // Checkout the target branch first
         try {
           await proj.git.checkout(branch);
         } catch {
           await proj.git.checkout(['-b', branch, `origin/${branch}`]);
         }
       }
+      const beforeCommit = await this.getHeadCommit(project);
       await proj.git.pull();
+      const afterCommit = await this.getHeadCommit(project);
+      return {
+        headCommit: afterCommit || `local-${Date.now()}`,
+        hasChanges: beforeCommit !== afterCommit,
+      };
     } catch {
       // Not a git repo or no remote — local files are always "current"
     }
     const afterCommit = await this.getHeadCommit(project);
     return {
       headCommit: afterCommit || `local-${Date.now()}`,
-      hasChanges: beforeCommit !== afterCommit,
+      hasChanges: false,
     };
   }
 
