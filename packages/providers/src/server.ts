@@ -43,6 +43,9 @@ export class CIServer {
   private isRunning = false;
   private lastSyncResults: SyncResult[] = [];
 
+  /** Tracks which project@branch pairs are currently syncing (prevents concurrent webhook syncs). */
+  private syncingProjects = new Set<string>();
+
   constructor(engine: SyncEngine) {
     this.engine = engine;
   }
@@ -196,13 +199,40 @@ export class CIServer {
     });
   }
 
+  /**
+   * Run syncProjectBranch with per-project lock and isRunning state tracking.
+   * If the same project@branch is already syncing, the request is skipped.
+   */
+  private async runSyncWithLock(
+    provider: SourceProvider,
+    project: string,
+    branch: string,
+  ): Promise<void> {
+    const key = `${project}@${branch}`;
+    if (this.syncingProjects.has(key)) {
+      console.log(`[webhook] ${key} is already syncing, skipping duplicate request.`);
+      return;
+    }
+    this.syncingProjects.add(key);
+    this.isRunning = true;
+    try {
+      const result = await this.engine.syncProjectBranch(provider, project, branch);
+      this.lastSyncResults = this.lastSyncResults
+        .filter(r => !(r.project === project && r.branch === branch));
+      this.lastSyncResults.push(result);
+    } finally {
+      this.syncingProjects.delete(key);
+      this.isRunning = this.syncingProjects.size > 0;
+    }
+  }
+
   private async triggerGitLabSync(pathWithNamespace: string, branch: string): Promise<void> {
     for (const provider of this.engine.getProviders()) {
       if (provider.type !== 'gitlab') continue;
       const projects = await provider.listProjects();
       const match = projects.find(p => p.name === pathWithNamespace);
       if (match) {
-        await this.engine.syncProjectBranch(provider, match.name, branch);
+        await this.runSyncWithLock(provider, match.name, branch);
         return;
       }
     }
@@ -225,7 +255,7 @@ export class CIServer {
         return false;
       });
       if (match) {
-        await this.engine.syncProjectBranch(provider, match.name, branch);
+        await this.runSyncWithLock(provider, match.name, branch);
         return;
       }
     }
